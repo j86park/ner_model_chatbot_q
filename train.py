@@ -70,27 +70,56 @@ def validate_epoch(model, dataloader, device):
     return total_loss / len(dataloader)
 
 
+def checkpoint(step, message):
+    """Print a formatted checkpoint message."""
+    print(f"\n{'='*60}")
+    print(f"[CHECKPOINT {step}] {message}")
+    print(f"{'='*60}")
+
+
 def main():
-    # Get device
+    print("\n" + "=" * 60)
+    print("       NER MODEL TRAINING PIPELINE")
+    print("=" * 60)
+
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 1: Device Configuration
+    # -------------------------------------------------------------------------
+    checkpoint(1, "DEVICE CONFIGURATION")
     device = config.get_device()
-    print(f"Using device: {device}")
+    print(f"  -> Device selected: {device}")
+    print(f"  -> CUDA available: {torch.cuda.is_available()}")
 
-    # Load data
-    print("Loading data...")
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 2: Data Loading
+    # -------------------------------------------------------------------------
+    checkpoint(2, "LOADING RAW DATA")
     data = load_data("data/raw_data.json")
-    print(f"Loaded {len(data)} samples")
+    print(f"  -> Successfully loaded {len(data)} samples from data/raw_data.json")
 
-    # Split data: 80% train, 20% validation
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 3: Train/Validation Split
+    # -------------------------------------------------------------------------
+    checkpoint(3, "SPLITTING DATA (80/20)")
     train_data, val_data = train_test_split(
         data, test_size=0.2, random_state=42
     )
-    print(f"Train samples: {len(train_data)}, Validation samples: {len(val_data)}")
+    print(f"  -> Training samples:   {len(train_data)}")
+    print(f"  -> Validation samples: {len(val_data)}")
 
-    # Load tokenizer
-    print(f"Loading tokenizer: {config.MODEL_CHECKPOINT}")
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 4: Tokenizer Initialization
+    # -------------------------------------------------------------------------
+    checkpoint(4, "LOADING TOKENIZER")
+    print(f"  -> Model checkpoint: {config.MODEL_CHECKPOINT}")
     tokenizer = AutoTokenizer.from_pretrained(config.MODEL_CHECKPOINT)
+    print(f"  -> Tokenizer loaded successfully")
+    print(f"  -> Vocab size: {tokenizer.vocab_size}")
 
-    # Create datasets
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 5: Dataset Creation
+    # -------------------------------------------------------------------------
+    checkpoint(5, "CREATING PYTORCH DATASETS")
     train_dataset = KeywordDataset(
         data=train_data,
         tokenizer=tokenizer,
@@ -103,17 +132,29 @@ def main():
         label2id=config.LABEL2ID,
         max_len=config.MAX_LEN,
     )
+    print(f"  -> Train dataset: {len(train_dataset)} samples")
+    print(f"  -> Val dataset:   {len(val_dataset)} samples")
+    print(f"  -> Max sequence length: {config.MAX_LEN}")
 
-    # Create dataloaders
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 6: DataLoader Creation
+    # -------------------------------------------------------------------------
+    checkpoint(6, "CREATING DATALOADERS")
     train_loader = DataLoader(
         train_dataset, batch_size=config.BATCH_SIZE, shuffle=True
     )
     val_loader = DataLoader(
         val_dataset, batch_size=config.BATCH_SIZE, shuffle=False
     )
+    print(f"  -> Batch size: {config.BATCH_SIZE}")
+    print(f"  -> Train batches per epoch: {len(train_loader)}")
+    print(f"  -> Val batches per epoch:   {len(val_loader)}")
 
-    # Load model with label configuration
-    print(f"Loading model: {config.MODEL_CHECKPOINT}")
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 7: Model Initialization
+    # -------------------------------------------------------------------------
+    checkpoint(7, "LOADING PRE-TRAINED MODEL")
+    print(f"  -> Loading: {config.MODEL_CHECKPOINT}")
     model = AutoModelForTokenClassification.from_pretrained(
         config.MODEL_CHECKPOINT,
         num_labels=len(config.LABEL2ID),
@@ -121,36 +162,63 @@ def main():
         label2id=config.LABEL2ID,
     )
     model.to(device)
+    print(f"  -> Model loaded and moved to {device}")
+    print(f"  -> Number of labels: {len(config.LABEL2ID)}")
+    print(f"  -> Labels: {list(config.LABEL2ID.keys())}")
 
-    # Optimizer
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 8: Optimizer Setup
+    # -------------------------------------------------------------------------
+    checkpoint(8, "CONFIGURING OPTIMIZER")
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.LEARNING_RATE)
+    print(f"  -> Optimizer: AdamW")
+    print(f"  -> Learning rate: {config.LEARNING_RATE}")
 
-    # Training loop
-    print(f"\nStarting training for {config.EPOCHS} epochs...")
-    print("-" * 50)
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 9: Training Loop
+    # -------------------------------------------------------------------------
+    checkpoint(9, "STARTING TRAINING LOOP")
+    print(f"  -> Total epochs: {config.EPOCHS}")
+    print("-" * 60)
 
     for epoch in range(config.EPOCHS):
-        print(f"\nEpoch {epoch + 1}/{config.EPOCHS}")
+        print(f"\n>>> EPOCH {epoch + 1}/{config.EPOCHS}")
 
         # Training phase
+        print("  [Training phase...]")
         train_loss = train_epoch(model, train_loader, optimizer, device)
-        print(f"  Train Loss: {train_loss:.4f}")
+        print(f"  -> Train Loss: {train_loss:.4f}")
 
         # Validation phase
+        print("  [Validation phase...]")
         val_loss = validate_epoch(model, val_loader, device)
-        print(f"  Validation Loss: {val_loss:.4f}")
+        print(f"  -> Validation Loss: {val_loss:.4f}")
 
-    print("-" * 50)
-    print("Training complete!")
+        print(f"  [Epoch {epoch + 1} complete]")
 
-    # Save model, tokenizer, and config
+    # -------------------------------------------------------------------------
+    # CHECKPOINT 10: Save Model
+    # -------------------------------------------------------------------------
+    checkpoint(10, "SAVING MODEL & TOKENIZER")
     output_dir = "./output/my_keyword_model"
     os.makedirs(output_dir, exist_ok=True)
+    print(f"  -> Output directory: {output_dir}")
 
-    print(f"\nSaving model to {output_dir}...")
     model.save_pretrained(output_dir)
+    print(f"  -> Model saved")
+
     tokenizer.save_pretrained(output_dir)
-    print("Model and tokenizer saved successfully!")
+    print(f"  -> Tokenizer saved")
+
+    # -------------------------------------------------------------------------
+    # FINAL: Pipeline Complete
+    # -------------------------------------------------------------------------
+    print("\n" + "=" * 60)
+    print("       TRAINING PIPELINE COMPLETED SUCCESSFULLY!")
+    print("=" * 60)
+    print(f"  Model saved to: {output_dir}")
+    print(f"  Ready for inference!")
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":
