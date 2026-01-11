@@ -3,6 +3,7 @@ Evaluation script for the NER Keyword model.
 Computes precision, recall, F1-score using seqeval.
 """
 
+import argparse
 import json
 import torch
 from torch.utils.data import DataLoader
@@ -105,8 +106,27 @@ def evaluate(model_path: str, test_data_path: str):
     print("=" * 60)
 
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Evaluate a trained NER model on test data"
+    )
+    
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        default="./output/my_keyword_model",
+        help="Path to the trained model directory (default: ./output/my_keyword_model)"
+    )
+    
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    MODEL_PATH = "./output/my_keyword_model"
+    args = parse_args()
+    
+    MODEL_PATH = args.model_path
     TEST_DATA_PATH = "./data/test_data.json"
     
+    print(f"🔍 Evaluating model at: {MODEL_PATH}...")
     evaluate(MODEL_PATH, TEST_DATA_PATH)
