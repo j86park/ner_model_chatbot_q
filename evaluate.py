@@ -5,6 +5,7 @@ Computes precision, recall, F1-score using seqeval.
 
 import argparse
 import json
+import os
 import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForTokenClassification, AutoTokenizer
@@ -87,6 +88,11 @@ def evaluate(model_path: str, test_data_path: str):
                 all_true_labels.append(sample_true)
                 all_pred_labels.append(sample_pred)
     
+    # Calculate metrics
+    precision = precision_score(all_true_labels, all_pred_labels)
+    recall = recall_score(all_true_labels, all_pred_labels)
+    f1 = f1_score(all_true_labels, all_pred_labels)
+    
     # Print evaluation results
     print("\n" + "=" * 60)
     print("EVALUATION RESULTS")
@@ -100,10 +106,25 @@ def evaluate(model_path: str, test_data_path: str):
     # Overall metrics
     print("-" * 60)
     print("Overall Metrics:")
-    print(f"  Precision: {precision_score(all_true_labels, all_pred_labels):.4f}")
-    print(f"  Recall:    {recall_score(all_true_labels, all_pred_labels):.4f}")
-    print(f"  F1 Score:  {f1_score(all_true_labels, all_pred_labels):.4f}")
+    print(f"  Precision: {precision:.4f}")
+    print(f"  Recall:    {recall:.4f}")
+    print(f"  F1 Score:  {f1:.4f}")
     print("=" * 60)
+    
+    # Save metrics to JSON file
+    model_name = os.path.basename(os.path.normpath(model_path))
+    metrics = {
+        "f1": round(f1, 4),
+        "precision": round(precision, 4),
+        "recall": round(recall, 4),
+        "model_name": model_name
+    }
+    
+    metrics_path = os.path.join(model_path, "metrics.json")
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2)
+    
+    print(f"\n📄 Metrics saved to: {metrics_path}")
 
 
 def parse_args():
