@@ -6,9 +6,10 @@ Computes precision, recall, F1-score using seqeval.
 import argparse
 import json
 import os
+from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
-from transformers import AutoModelForTokenClassification, AutoTokenizer
+from transformers import AutoModelForTokenClassification, AutoTokenizer, DistilBertTokenizerFast, DistilBertForTokenClassification
 from seqeval.metrics import classification_report, f1_score, precision_score, recall_score
 
 from src.dataset import KeywordDataset
@@ -21,6 +22,52 @@ def load_test_data(path: str) -> list:
         return json.load(f)
 
 
+def load_local_model(model_path: str):
+    """
+    Load model and tokenizer from a local directory.
+    Works around HuggingFace Hub validation issues on Windows.
+    
+    Args:
+        model_path: Absolute path to the model directory.
+    
+    Returns:
+        Tuple of (tokenizer, model)
+    """
+    model_dir = Path(model_path)
+    
+    # Check if directory exists
+    if not model_dir.exists():
+        raise FileNotFoundError(f"Model directory not found: {model_path}")
+    
+    # Check for required files
+    config_file = model_dir / "config.json"
+    if not config_file.exists():
+        raise FileNotFoundError(f"config.json not found in {model_path}")
+    
+    # Load config to determine model type
+    with open(config_file, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    
+    model_type = config.get("model_type", "distilbert")
+    
+    # Load tokenizer and model based on type
+    if model_type == "distilbert":
+        tokenizer = DistilBertTokenizerFast(
+            vocab_file=str(model_dir / "vocab.txt"),
+            tokenizer_file=str(model_dir / "tokenizer.json"),
+        )
+        model = DistilBertForTokenClassification.from_pretrained(
+            str(model_dir),
+            local_files_only=True
+        )
+    else:
+        # Fallback for other model types
+        tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
+        model = AutoModelForTokenClassification.from_pretrained(str(model_dir), local_files_only=True)
+    
+    return tokenizer, model
+
+
 def evaluate(model_path: str, test_data_path: str):
     """
     Evaluate the NER model on the test set.
@@ -29,13 +76,15 @@ def evaluate(model_path: str, test_data_path: str):
         model_path: Path to the trained model directory.
         test_data_path: Path to the test data JSON file.
     """
+    # Convert to absolute path
+    model_path = os.path.abspath(model_path)
+    
     device = get_device()
     print(f"Using device: {device}")
     
     # Load model and tokenizer
     print(f"Loading model from: {model_path}")
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForTokenClassification.from_pretrained(model_path)
+    tokenizer, model = load_local_model(model_path)
     model.to(device)
     model.eval()
     
